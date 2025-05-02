@@ -1,0 +1,15 @@
+
+1. The python code written based on considering the 18 factors and subfactors and their different categorization.
+
+2. The Python code 'Factors_with_text.py'is used for generating synthetic data set 'descriptive_patient_dataset.csv'.
+
+3. Three different LLMs: LLaMA32, DeepSeek-R13, and OpenChat4 have applied on the dataset considering 
+   three scenarios (S1,S2, and S3) to identify the accuracy for consent fatigue prediction
+
+4. Five ML model: Gradient Boosting Machine (GBM), Random Forest (RF), Support Vector Machine (SVM), 
+   Logistic Regression (LR), Multilayer Perceptron (MLP) have been applid on the dataset and calculate
+   mean accuracy (MA) and standard deviation (Std).
+
+5. MATLAB has been used to simulate the proposed model. MATLAB applied on the same dataset and 2 visuals appeared as output.
+   The histogram graph presented overall distributionof fatigue probabilities (Pfatigue) across patients and the Spotted graph
+   presents a positive correlation between cumulative burden and fatigue probability.
