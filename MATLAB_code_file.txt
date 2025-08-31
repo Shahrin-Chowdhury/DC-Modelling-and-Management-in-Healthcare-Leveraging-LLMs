@@ -1,0 +1,217 @@
+%% Dynamic Consent Fatigue Simulation for Descriptive CSV Dataset
+
+% Step 1: Select CSV File
+start_path = 'E:\Year3\CCNC';
+[file, path] = uigetfile('*.csv', 'Select your patient dataset', start_path);
+if isequal(file,0)
+    disp('❌ User canceled file selection. Exiting script.');
+    return;
+else
+    filename = fullfile(path, file);
+    data = readtable(filename, 'VariableNamingRule', 'preserve');
+end
+
+% Step 2: Extract Patient Names
+patient_names = data.("Patient Name");
+
+% Step 3: Define Mappings
+f_map = containers.Map({'Very Low', 'Low', 'Low to Moderate', 'Moderate', 'High', 'Very High'}, [1, 2, 2, 3, 4, 5]);
+f4_map = containers.Map({'Full Capacity', 'Slightly Impaired', 'Moderately Impaired', 'Severely Impaired', 'No Capacity'}, [5, 4, 3, 2, 1]);
+h1_map = containers.Map({'Young Adult', 'Middle-Aged', 'Older Adult', 'Senior', 'Elderly'}, [5, 4, 3, 2, 1]);
+h2_map = containers.Map({'Male', 'Female', 'Other / Non-binary'}, [3, 3, 2]);
+h34_map = containers.Map({'No formal education / Primary only', 'Secondary (up to high school)', 'Some college / Vocational training', 'Bachelor’s degree', 'Graduate degree or higher'}, [1, 2, 3, 4, 5]);
+h4567_map = containers.Map({'Very Low', 'Low', 'Moderate', 'High', 'Very High'}, [1, 2, 3, 4, 5]);
+h6_map = containers.Map({'Very Low Alignment', 'Low', 'Moderate', 'High', 'Very High'}, [1, 2, 3, 4, 5]);
+h8_map = containers.Map({'None', 'Minimal', 'Moderate', 'High', 'Very High'}, [1, 2, 3, 4, 5]);
+h9_map = containers.Map({'Severely Impaired', 'Impaired', 'Fluctuating / Mixed', 'Clear but Stressed', 'Stable and Clear'}, [1, 2, 3, 4, 5]);
+
+% Step 4: Check for Missing Keys before Mapping
+checkMissingKeys(data.("f1: Frequency"), f_map, 'f1: Frequency');
+checkMissingKeys(data.("f2: Urgency"), f_map, 'f2: Urgency');
+checkMissingKeys(data.("f3: Severity"), f_map, 'f3: Severity');
+checkMissingKeys(data.("f4: Capacity"), f4_map, 'f4: Capacity');
+checkMissingKeys(data.("h1: Age"), h1_map, 'h1: Age');
+checkMissingKeys(data.("h2: Gender"), h2_map, 'h2: Gender');
+checkMissingKeys(data.("h3: Education Level"), h34_map, 'h3: Education Level');
+checkMissingKeys(data.("h4: Health Literacy"), h4567_map, 'h4: Health Literacy');
+checkMissingKeys(data.("h5: Tech Proficiency"), h4567_map, 'h5: Tech Proficiency');
+checkMissingKeys(data.("h6: Language / Culture"), h6_map, 'h6: Language / Culture');
+checkMissingKeys(data.("h7: Socioeconomic Status"), h4567_map, 'h7: Socioeconomic Status');
+checkMissingKeys(data.("h8: Previous Experience"), h8_map, 'h8: Previous Experience');
+checkMissingKeys(data.("h9: Cognitive/Mental State"), h9_map, 'h9: Cognitive/Mental State');
+checkMissingKeys(data.("f6: Redundancy"), f_map, 'f6: Redundancy');
+checkMissingKeys(data.("f7: Environment"), f_map, 'f7: Environment');
+checkMissingKeys(data.("f8: Communication Quality"), f_map, 'f8: Communication Quality');
+checkMissingKeys(data.("f9: Consent Granularity"), f_map, 'f9: Consent Granularity');
+checkMissingKeys(data.("f10: Cumulative Load"), f_map, 'f10: Cumulative Load');
+
+% Step 5: Mapping Descriptive Labels to Numeric Scores
+factor_numeric = zeros(height(data), 18);
+factor_numeric(:,1) = cell2mat(values(f_map, data.("f1: Frequency")));
+factor_numeric(:,2) = cell2mat(values(f_map, data.("f2: Urgency")));
+factor_numeric(:,3) = cell2mat(values(f_map, data.("f3: Severity")));
+factor_numeric(:,4) = cell2mat(values(f4_map, data.("f4: Capacity")));
+factor_numeric(:,5) = cell2mat(values(h1_map, data.("h1: Age")));
+factor_numeric(:,6) = cell2mat(values(h2_map, data.("h2: Gender")));
+factor_numeric(:,7) = cell2mat(values(h34_map, data.("h3: Education Level")));
+factor_numeric(:,8) = cell2mat(values(h4567_map, data.("h4: Health Literacy")));
+factor_numeric(:,9) = cell2mat(values(h4567_map, data.("h5: Tech Proficiency")));
+factor_numeric(:,10) = cell2mat(values(h6_map, data.("h6: Language / Culture")));
+factor_numeric(:,11) = cell2mat(values(h4567_map, data.("h7: Socioeconomic Status")));
+factor_numeric(:,12) = cell2mat(values(h8_map, data.("h8: Previous Experience")));
+factor_numeric(:,13) = cell2mat(values(h9_map, data.("h9: Cognitive/Mental State")));
+factor_numeric(:,14) = cell2mat(values(f_map, data.("f6: Redundancy")));
+factor_numeric(:,15) = cell2mat(values(f_map, data.("f7: Environment")));
+factor_numeric(:,16) = cell2mat(values(f_map, data.("f8: Communication Quality")));
+factor_numeric(:,17) = cell2mat(values(f_map, data.("f9: Consent Granularity")));
+factor_numeric(:,18) = cell2mat(values(f_map, data.("f10: Cumulative Load")));
+
+% Step 6: Set Weights
+weights = rand(1,18);
+
+% Step 7: Calculate Cumulative Fatigue and Risk Scores (IMPROVED)
+C_patients = sum(factor_numeric, 2) * 5; % Scaling factor
+R_patients = factor_numeric * weights';
+R_patients = (R_patients - mean(R_patients)) / std(R_patients); % Normalize
+P_fatigue_patients = 1 ./ (1 + exp(-R_patients)); % Sigmoid
+
+% Step 8: Thresholds
+tau_C = 65;
+tau_P = 0.6;
+
+% Step 9: Fatigue Level Classification
+fatigue_level = strings(height(data), 1);
+for i = 1:height(data)
+    if P_fatigue_patients(i) >= 0.75
+        fatigue_level(i) = "High";
+    elseif P_fatigue_patients(i) >= 0.5
+        fatigue_level(i) = "Moderate";
+    else
+        fatigue_level(i) = "Low";
+    end
+end
+
+% Step 10: Plot Results
+
+% 10.1 Histogram + KDE
+figure;
+histogram(P_fatigue_patients, 30, 'Normalization', 'pdf', 'FaceColor', 'cyan', 'EdgeColor', 'black');
+hold on;
+% Kernel density estimate
+[f, xi] = ksdensity(P_fatigue_patients);
+plot(xi, f, 'r-', 'LineWidth', 2);
+
+% Threshold line
+yline(tau_P, '--r', 'Threshold P', 'FontSize', 12);
+
+% Axis labels with larger font
+xlabel('Fatigue Probability (P_{fatigue})', 'FontSize', 14);
+ylabel('Density', 'FontSize', 14);
+
+% Increase tick label font size
+set(gca, 'FontSize', 12);
+
+% Optional ticks and limits
+xticks([0 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0 1.5]);
+xlim([0 1]);
+
+grid on;
+hold off;
+
+
+% 10.2 Scatter Plot
+% Create figure with specific size and DPI
+% Create figure with specific size and DPI settings
+fig = figure('Units', 'inches', ...
+             'Position', [1, 1, 6, 4], ...
+             'PaperPositionMode', 'auto', ...
+             'Color', 'w');
+
+set(gcf, 'Renderer', 'painters');
+set(gcf, 'InvertHardcopy', 'off');
+set(gcf, 'PaperUnits', 'inches', 'PaperPosition', [0 0 3 3]); % Matches display size
+
+% Scatter plot
+scatter(C_patients, P_fatigue_patients, 50, P_fatigue_patients, 'filled');
+cb = colorbar;
+colormap('parula');
+cb.FontSize = 12; % Set colorbar tick label size
+
+hold on;
+
+% Threshold line
+yline(tau_P, '--r', 'Threshold P', 'FontSize', 12);
+
+% Axis labels with larger font
+xlabel('Cumulative Fatigue Score (C)', 'FontSize', 14);
+ylabel('Fatigue Probability (P_{fatigue})', 'FontSize', 14);
+
+% Increase axis tick label font size
+set(gca, 'FontSize', 12);
+
+% Automatic axis limits
+xlim([min(C_patients), max(C_patients)]);
+ylim([min(P_fatigue_patients), max(P_fatigue_patients)]);
+
+grid on;
+hold off;
+
+
+% Optional: Save figure with 300 DPI
+% print(fig, 'fatigue_plot', '-dpng', '-r300');  % Save as PNG
+
+
+% Optional: save at 300 DPI
+% print('fatigue_scatter_plot','-dpng','-r300');
+
+
+% 10.3 Heatmap
+% 10.3 Professional Heatmap Using heatmap()
+%figure('Position', [100 100 1000 600]); % Bigger figure for better clarity
+
+% Create heatmap
+%h = heatmap(factor_numeric(1:50,:));
+
+% Set axis labels
+%h.Title = 'Heatmap of Factor Intensities across First 50 Patients';
+%h.XLabel = 'Factors';
+%h.YLabel = 'Patients';
+
+% Set X-axis factor names
+%h.XDisplayLabels = {'f1','f2','f3','f4','h1','h2','h3','h4','h5','h6','h7','h8','h9','f6','f7','f8','f9','f10'};
+
+% Set Y-axis patient names
+%patient_labels = compose('Patient %d', 1:50);
+%h.YDisplayLabels = patient_labels;
+
+% Customize color map
+%colormap('YlGnBu');
+%colorbar;
+
+% Adjust color scaling if needed
+%h.ColorLimits = [1 5]; % because your factor values range from 1 to 5
+
+% Font and style improvements
+%h.FontSize = 12;
+
+
+% Step 11: Output Summary
+summary_table = table(patient_names, C_patients, P_fatigue_patients, fatigue_level, ...
+    'VariableNames', {'PatientName', 'CumulativeFatigue', 'FatigueProbability', 'FatigueLevel'});
+
+disp(summary_table);
+writetable(summary_table, 'patients_fatigue_summary_from_descriptive.csv');
+
+%% Helper Function
+function checkMissingKeys(data_column, mapping, column_name)
+    unique_values = unique(data_column);
+    map_keys = keys(mapping);
+    missing = setdiff(unique_values, map_keys);
+    if isempty(missing)
+        fprintf('✅ All keys for %s are correctly mapped.\n', column_name);
+    else
+        fprintf('⚠️ Missing keys found in %s:\n', column_name);
+        disp(missing);
+        error('❌ Please update your mapping for column: %s', column_name);
+    end
+end
